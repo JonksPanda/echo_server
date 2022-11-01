@@ -1,6 +1,8 @@
 from socket import *
 from time import sleep
 from threading import Thread, enumerate
+import sys
+import os
 
 
 class Server:
@@ -10,14 +12,23 @@ class Server:
         self.threads = enumerate()
         self.connections = {}
 
-    def connect(self, s):
+    def close_connection(self, addr):
+        for thread in self.threads:
+            name = thread.name
+            if str(name) == str(addr):
+                print(f"closing connection {addr}")
+                self.connections[addr].close()
+                self.connections.pop(addr, None)
+                sys.exit()
+
+    def self_destruct(self, addr):
+        print(f"{addr} initiated self destruct..")
+        for addr in self.connections.keys:
+            print(addr)
+            self.close_connection(addr)
+
+    def connect(self, conn, addr):
         while True:
-            s.listen(1)
-            conn, addr = s.accept()
-            self.connections.update({addr: conn})
-            self.threads.append(
-                Thread(target=self.connect, args=(s,), daemon=False))
-            self.threads[-1].start()
             print(self.threads)
             with conn:
                 print("connected by", addr)
@@ -26,9 +37,11 @@ class Server:
                         data = conn.recv(1024)
                         print(f"received from {addr}: {data.decode()}")
                         if not data:
+                            self.close_connection(addr)
                             break
                         data = self.check_command(data.decode(), conn, addr)
                     except:
+                        self.close_connection(addr)
                         break
 
     def send_message(self, msg, conn):
@@ -55,6 +68,8 @@ class Server:
                 f"reverse: {self.reverse_string(string[1:])}", conn)
         elif command == "b":
             self.broadcast(f"broadcast: {string[1:]}", addr)
+        elif string.lower() == "self destruct":
+            self.self_destruct(addr)
         elif command.isnumeric():
             self.repeat(string[1:], command, conn)
         else:
@@ -64,7 +79,12 @@ class Server:
         with socket() as s:
             s.bind((self.HOST, self.PORT))
             while True:
-                self.connect(s)
+                s.listen(1)
+                conn, addr = s.accept()
+                self.connections.update({addr: conn})
+                self.threads.append(
+                    Thread(target=self.connect, args=(conn, addr), daemon=True, name=addr))
+                self.threads[-1].start()
 
     def broadcast(self, string, addr):
         for conn in self.connections.values():
@@ -72,7 +92,9 @@ class Server:
 
 
 def main():
-    Server().connection_loop()
+    server = Server()
+    server.connection_loop()
+    server.threads
 
 
 if __name__ == "__main__":
